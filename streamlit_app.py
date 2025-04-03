@@ -1,24 +1,24 @@
 
 import streamlit as st
+import pytesseract
 from PIL import Image
-import easyocr
 import numpy as np
 import re
 
-reader = easyocr.Reader(['en'], gpu=False)
-
-def extract_field(pattern, text, group=1):
+def extract_field(pattern, text, group=None):
     match = re.search(pattern, text)
-    return match.group(group) if match else ''
+    if not match:
+        return ''
+    return match.group(group) if group is not None else match.group(0)
 
 def parse_email_text(text):
-    name = extract_field(r"Name:\s*(.*)", text)
+    name = extract_field(r"Name:\s*(.*)", text, group=1)
     address_line_1 = extract_field(r"\d+\s+[^,\n]+", text)
-    suburb = extract_field(r"\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\b(?=\s+(VIC|NSW|QLD|WA|SA|TAS|NT|ACT))", text)
-    state = extract_field(r"\b(VIC|NSW|QLD|WA|SA|TAS|NT|ACT)\b", text)
-    postcode = extract_field(r"\b(\d{4})\b", text)
-    phone = extract_field(r"(04\d{8}|\+614\d{8})", text)
-    email = extract_field(r"([\w.-]+@[\w.-]+\.[A-Za-z]{2,})", text)
+    suburb = extract_field(r"\b([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\b(?=\s+(VIC|NSW|QLD|WA|SA|TAS|NT|ACT))", text, group=1)
+    state = extract_field(r"\b(VIC|NSW|QLD|WA|SA|TAS|NT|ACT)\b", text, group=1)
+    postcode = extract_field(r"\b(\d{4})\b", text, group=1)
+    phone = extract_field(r"(04\d{8}|\+614\d{8})", text, group=1)
+    email = extract_field(r"([\w.-]+@[\w.-]+\.[A-Za-z]{2,})", text, group=1)
     product_match = re.findall(r"Design:.*?\n|Material:.*?\n", text)
     product = ' '.join([line.strip() for line in product_match])
 
@@ -40,8 +40,7 @@ if uploaded_file:
     st.write("Processing with OCR…")
 
     with st.spinner("Extracting text..."):
-        result = reader.readtext(np.array(image), detail=0)
-        text = "\n".join(result)
+        text = pytesseract.image_to_string(image)
         csv_row = parse_email_text(text)
 
     st.text_area("CSV Row Output", value=csv_row, height=100)
